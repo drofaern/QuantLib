@@ -1,3 +1,4 @@
+add_subdirectory(Autocall)
 add_subdirectory(BasketLosses)
 add_subdirectory(BermudanSwaption)
 add_subdirectory(Bonds)

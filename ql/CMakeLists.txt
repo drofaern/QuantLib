@@ -278,6 +278,8 @@ set(QuantLib_SRC
     indexes/swapindex.cpp
     instruments/asianoption.cpp
     instruments/assetswap.cpp
+    instruments/autocall/touchoption.cpp
+    instruments/autocall/autocall.cpp
     instruments/averagetype.cpp
     instruments/barrieroption.cpp
     instruments/barriertype.cpp
@@ -662,6 +664,8 @@ set(QuantLib_SRC
     pricingengines/asian/mc_discr_arith_av_strike.cpp
     pricingengines/asian/mc_discr_geom_av_price.cpp
     pricingengines/asian/mc_discr_geom_av_price_heston.cpp
+    pricingengines/autocall/mcautocallengine.cpp
+    pricingengines/autocall/fdblackscholestouchengine.cpp
     pricingengines/barrier/analyticbarrierengine.cpp
     pricingengines/barrier/analyticbinarybarrierengine.cpp
     pricingengines/barrier/discretizedbarrieroption.cpp
@@ -1340,6 +1344,8 @@ set(QuantLib_HDR
     instruments/all.hpp
     instruments/asianoption.hpp
     instruments/assetswap.hpp
+    instruments/autocall/touchoption.hpp
+    instruments/autocall/autocall.hpp
     instruments/averagetype.hpp
     instruments/barrieroption.hpp
     instruments/barriertype.hpp
@@ -1927,6 +1933,8 @@ set(QuantLib_HDR
     pricingengines/asian/mc_discr_geom_av_price_heston.hpp
     pricingengines/asian/mcdiscreteasianengine.hpp
     pricingengines/asian/mcdiscreteasianenginebase.hpp
+    pricingengines/autocall/mcautocallengine.hpp
+    pricingengines/autocall/fdblackscholestouchengine.cpp
     pricingengines/barrier/all.hpp
     pricingengines/barrier/analyticbarrierengine.hpp
     pricingengines/barrier/analyticbinarybarrierengine.hpp
