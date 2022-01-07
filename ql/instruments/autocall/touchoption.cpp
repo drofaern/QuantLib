@@ -46,12 +46,12 @@ namespace QuantLib {
         auto* moreArgs = dynamic_cast<TouchOption::arguments*>(args);
         QL_REQUIRE(moreArgs != nullptr, "wrong argument type");
         moreArgs->touchType = touchType_;
-        moreArgs->barrierHigh = std::move(barrierHigh_);
-        moreArgs->barrierLow = std::move(barrierLow_);
-        moreArgs->rebateHigh = std::move(rebateHigh_);
-        moreArgs->rebateLow = std::move(rebateLow_);
-        moreArgs->obsHigh = std::move(obsHigh_);
-        moreArgs->obsLow = std::move(obsLow_);
+        moreArgs->barrierHigh = barrierHigh_;
+        moreArgs->barrierLow = barrierLow_;
+        moreArgs->rebateHigh = rebateHigh_;
+        moreArgs->rebateLow = rebateLow_;
+        moreArgs->obsHigh = obsHigh_;
+        moreArgs->obsLow = obsLow_;
         moreArgs->payoffAtExpiry = payoffAtExpiry_;
     }
 
