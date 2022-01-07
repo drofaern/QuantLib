@@ -53,6 +53,8 @@ namespace QuantLib {
                     std::vector<Real> barrierLow,
                     std::vector<Real> rebateHigh,
                     std::vector<Real> rebateLow,
+                    std::vector<Date> obsHigh,
+                    std::vector<Date> obsLow,
                     bool payoffAtExpiry,
                     const ext::shared_ptr<Exercise>& exercise);
         void setupArguments(PricingEngine::arguments*) const override;
@@ -63,6 +65,8 @@ namespace QuantLib {
         std::vector<Real> barrierLow_;
         std::vector<Real> rebateHigh_;
         std::vector<Real> rebateLow_;
+        std::vector<Date> obsHigh_;
+        std::vector<Date> obsLow_;
         bool payoffAtExpiry_;
 
     };
@@ -76,6 +80,8 @@ namespace QuantLib {
         std::vector<Real> barrierLow;
         std::vector<Real> rebateHigh;
         std::vector<Real> rebateLow;
+        std::vector<Date> obsHigh;
+        std::vector<Date> obsLow;
         bool payoffAtExpiry;
         void validate() const override;
     };

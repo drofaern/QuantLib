@@ -32,6 +32,8 @@
 #include <ql/termstructures/volatility/equityfx/blackvariancecurve.hpp>
 #include <ql/termstructures/volatility/equityfx/blackvariancesurface.hpp>
 #include <ql/utilities/dataformatters.hpp>
+#include <ql/time/calendars/china.hpp>
+#include <ql/time/schedule.hpp>
 
 using namespace QuantLib;
 
@@ -75,6 +77,7 @@ struct TouchOptionData {
     std::vector<Real> barrierLow;
     std::vector<Real> rebateHigh;
     std::vector<Real> rebateLow;
+    int frequency;
     bool payAtExpiry;
     Real strike;
     Real s;        // spot
@@ -90,6 +93,7 @@ struct TouchOptionData {
 int main(int, char* []) {
 
     try {
+        std::vector<Real> pay = {0.33333333, 0.66666667, 1,         1.33333333, 1.66666667, 2, 2.33333333, 2.66666667, 3,         3.33333333, 3.66666667, 4};
         TouchOptionData values[] = {
             /* The data below are from
               "Option pricing formulas 2nd Ed.", E.G. Haug, McGraw-Hill 2007 pag. 180 - cases 13,14,17,18,21,22,25,26
@@ -97,10 +101,10 @@ int main(int, char* []) {
                 q is the dividend rate, while the book gives b, the cost of carry (q=r-b)
             */
             //    barrierType, barrier,  cash,         type, strike,   spot,    q,    r,   t,  vol,   value, tol
-            
-            { Touch::OneTouchUp,   {103.00}, {}, {2.00}, {}, false, 100.00, 100.00, 0.00, 0.025, 1, 0.10,  0.0000, 1e-4 },
-            { Touch::OneTouchUp,   {103.00}, {}, {2.00}, {}, false, 100.00, 100.00, 0.00, 0.025, 2, 0.10,  0.0000, 1e-4 },            
-            { Touch::OneTouchUp,   {103.00}, {}, {2.00}, {}, true, 100.00, 100.00, 0.00, 0.025, 1, 0.10,  0.0000, 1e-4 }
+            { Touch::OneTouchUp,   {103.00}, {}, {2.00}, {}, 0, false, 100.00, 100.00, 0.00, 0.025, 1, 0.10,  0.0000, 1e-4 },            
+            { Touch::OneTouchUp,   {103.00}, {}, pay, {}, 12, false, 100.00, 100.00, 0.00, 0.025, 1, 0.10,  0.0000, 1e-4 }
+            //{ Touch::OneTouchUp,   {103.00}, {}, {2.00}, {}, 0, false, 100.00, 100.00, 0.00, 0.025, 2, 0.10,  0.0000, 1e-4 },
+            //{ Touch::OneTouchUp,   {103.00}, {}, {2.00}, {}, 0, true, 100.00, 100.00, 0.00, 0.025, 1, 0.10,  0.0000, 1e-4 }
             // { Barrier::DownIn,  100.00, 15.00, Option::Call, 102.00, 105.00, 0.00, 0.10, 0.5, 0.20,  4.9289, 1e-4 },
             // { Barrier::DownIn,  100.00, 15.00, Option::Call,  98.00, 105.00, 0.00, 0.10, 0.5, 0.20,  6.2150, 1e-4 },
             // // following value is wrong in book. 
@@ -142,22 +146,32 @@ int main(int, char* []) {
 
         DayCounter dc = Actual360();
         Date today = Date::todaysDate();
-
+        Calendar calendar = China();
+        
         ext::shared_ptr<SimpleQuote> spot(new SimpleQuote(0.0));
         ext::shared_ptr<SimpleQuote> qRate(new SimpleQuote(0.00));
         ext::shared_ptr<YieldTermStructure> qTS = flatRate(today, qRate, dc);
         ext::shared_ptr<SimpleQuote> rRate(new SimpleQuote(0.00));
         ext::shared_ptr<YieldTermStructure> rTS = flatRate(today, rRate, dc);
         ext::shared_ptr<SimpleQuote> vol(new SimpleQuote(0.0));
-        ext::shared_ptr<BlackVolTermStructure> volTS = flatVol(today, vol, dc);
+        ext::shared_ptr<BlackVolTermStructure> volTS = flatVol(today, calendar, vol, dc);
 
         for (auto& value : values) {
+
             Date exDate = today + timeToDays(value.t);
             ext::shared_ptr<Exercise> amExercise(new AmericanExercise(today,
                                                                         exDate,
                                                                         true));
+            ext::shared_ptr<Schedule> fixingDates;
+            if (value.frequency == 12){
+              Frequency frequency = Monthly;
+              BusinessDayConvention convention = Following;
+              fixingDates = ext::make_shared<Schedule>(today,exDate,Period(frequency),
+                                 calendar,convention,convention,
+                                 DateGeneration::Forward,false);
+            }
 
-            spot->setValue(value.s);
+            spot->setValue(value.s);  
             qRate->setValue(value.q);
             rRate->setValue(value.r);
             vol->setValue(value.v);
@@ -168,11 +182,13 @@ int main(int, char* []) {
                                           Handle<YieldTermStructure>(rTS),
                                           Handle<BlackVolTermStructure>(volTS)));
             ext::shared_ptr<PricingEngine> engine(
-                                 new FdBlackScholesTouchEngine(stochProcess, Size(360), Size(500)));
+                                 new FdBlackScholesTouchEngine(stochProcess, Size(360), Size(5000)));
 
-            
-            TouchOption opt(value.touchType, value.barrierHigh, value.barrierLow, value.rebateHigh, value.rebateLow, value.payAtExpiry, amExercise);
-            
+            std::vector<Date> obs;
+
+            TouchOption opt(value.touchType, value.barrierHigh, value.barrierLow, value.rebateHigh, value.rebateLow, 
+              fixingDates == 0 ? obs : fixingDates->dates(), obs, value.payAtExpiry, amExercise);
+
             opt.setPricingEngine(engine);
 
             Real calculated = opt.NPV();
@@ -180,7 +196,6 @@ int main(int, char* []) {
             REPORT("value", amExercise, value.touchType, value.barrierHigh[0], value.payAtExpiry, value.s,
                      value.q, value.r, today, value.v, value.result, calculated, error,
                      value.tol);
-            
         }
     } catch (std::exception& e) {
         std::cerr << e.what() << std::endl;

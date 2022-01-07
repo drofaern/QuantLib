@@ -92,6 +92,15 @@ namespace QuantLib {
     }
 
     ext::shared_ptr<BlackVolTermStructure>
+    flatVol(const Date& today,
+            const Calendar cal,
+            const ext::shared_ptr<Quote>& vol,
+            const DayCounter& dc) {
+        return ext::shared_ptr<BlackVolTermStructure>(new
+            BlackConstantVol(today, cal, Handle<Quote>(vol), dc));
+    }
+
+    ext::shared_ptr<BlackVolTermStructure>
     flatVol(const Date& today, Volatility vol,
             const DayCounter& dc) {
         return flatVol(today,

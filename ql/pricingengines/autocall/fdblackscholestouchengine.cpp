@@ -25,6 +25,7 @@
 #include <ql/methods/finitedifferences/meshers/fdmmeshercomposite.hpp>
 #include <ql/methods/finitedifferences/operators/fdmlinearoplayout.hpp>
 #include <ql/methods/finitedifferences/solvers/fdmblackscholessolver.hpp>
+#include <ql/methods/finitedifferences/stepconditions/fdmknockoutcondition.hpp>
 #include <ql/methods/finitedifferences/stepconditions/fdmstepconditioncomposite.hpp>
 #include <ql/methods/finitedifferences/utilities/fdmdirichletboundary.hpp>
 #include <ql/methods/finitedifferences/utilities/fdmdiscountdirichletboundary.hpp>
@@ -51,8 +52,6 @@ namespace QuantLib {
 
     void FdBlackScholesTouchEngine::calculate() const {        
         // 1. Mesher
-        const ext::shared_ptr<StrikedTypePayoff> payoff =
-            ext::dynamic_pointer_cast<StrikedTypePayoff>(arguments_.payoff);
         const Time maturity = process_->time(arguments_.exercise->lastDate());
 
         Real xMin=Null<Real>();
@@ -61,11 +60,11 @@ namespace QuantLib {
         const Real spot = process_->x0();
 
         if (arguments_.touchType == Touch::OneTouchUp) {
-            if (arguments_.barrierHigh.size() == 1){
-                xMax = std::log(arguments_.barrierHigh[0]);                
+            if (arguments_.obsHigh.size() <= 1){
+                xMax = std::log(arguments_.barrierHigh[0]);
             }else{
                 auto max_barrier = std::max_element(arguments_.barrierHigh.begin(), arguments_.barrierHigh.end());
-                xMax = std::log(4 * std::max(*max_barrier, spot));
+                xMax = 4 * std::log(std::max(*max_barrier, spot));
             }
             xMin = 0;
         }
@@ -79,7 +78,7 @@ namespace QuantLib {
         }
 
         const ext::shared_ptr<Fdm1dMesher> equityMesher(
-            new FdmBlackScholesMesher(
+            ext::make_shared<FdmBlackScholesMesher>(
                 xGrid_, process_, maturity, 100,  // strike set to 100, TODO: could we use spot here?
                 xMin, xMax, 0.0001, 1.5,
                 std::make_pair(Null<Real>(), Null<Real>())));
@@ -87,34 +86,54 @@ namespace QuantLib {
         const ext::shared_ptr<FdmMesher> mesher (
             ext::make_shared<FdmMesherComposite>(equityMesher));
 
-        // 2. Calculator
+        // 2. Calculator        
+        const ext::shared_ptr<StrikedTypePayoff> payoff =
+            ext::dynamic_pointer_cast<StrikedTypePayoff>(arguments_.payoff);
         ext::shared_ptr<FdmInnerValueCalculator> calculator(
             ext::make_shared<FdmLogInnerValue>(payoff, mesher, 0));
+            
 
         // 3. Step conditions
         std::list<ext::shared_ptr<StepCondition<Array> > > stepConditions;
         std::list<std::vector<Time> > stoppingTimes;
+        std::vector<Time> stoppingTime;
+        for (int i = 0; i < arguments_.obsHigh.size(); i ++){
+            ext::shared_ptr<StrikedTypePayoff> payoff_i =
+                ext::make_shared<CashOrNothingPayoff>(Option::Type::Call, arguments_.barrierHigh[0], arguments_.rebateHigh[i]);
 
-        // 3.1 Step condition if discrete dividends
-        // ext::shared_ptr<FdmDividendHandler> dividendCondition(
-        //     ext::make_shared<FdmDividendHandler>(arguments_.cashFlow, mesher,
-        //                            process_->riskFreeRate()->referenceDate(),
-        //                            process_->riskFreeRate()->dayCounter(), 0));
+            ext::shared_ptr<FdmInnerValueCalculator> calculator_i(
+                ext::make_shared<FdmLogInnerValue>(payoff_i, mesher, 0));
 
-        // if(!arguments_.cashFlow.empty()) {
-        //     stepConditions.push_back(dividendCondition);
-        //     stoppingTimes.push_back(dividendCondition->dividendTimes());
-        // }
+            Time t = process_->time(arguments_.obsHigh[i]);
+            ext::shared_ptr<FdmKnockoutCondition> knockoutCondition(
+                ext::make_shared<FdmKnockoutCondition>(t, mesher, calculator_i));
+            
+            stepConditions.push_back(knockoutCondition);
+            stoppingTime.push_back(t);
+        }
+        stoppingTimes.push_back(stoppingTime);
 
-        // QL_REQUIRE(arguments_.exercise->type() == Exercise::European,
-        //            "only european style option are supported");
+        for (int i = 0; i < arguments_.obsLow.size(); i ++){
+            ext::shared_ptr<StrikedTypePayoff> payoff_i =
+                ext::make_shared<CashOrNothingPayoff>(Option::Type::Put, arguments_.barrierLow[i], arguments_.rebateLow[i]);
+
+            ext::shared_ptr<FdmInnerValueCalculator> calculator_i(
+                ext::make_shared<FdmLogInnerValue>(payoff_i, mesher, 0));
+
+            Time t = process_->time(arguments_.obsLow[i]);
+            ext::shared_ptr<FdmKnockoutCondition> knockoutCondition(
+                ext::make_shared<FdmKnockoutCondition>(t, mesher, calculator_i));
+            
+            stepConditions.push_back(knockoutCondition);
+            stoppingTimes.push_back(std::vector<Time>({t}));
+        }
 
         ext::shared_ptr<FdmStepConditionComposite> conditions(
             ext::make_shared<FdmStepConditionComposite>(stoppingTimes, stepConditions));
 
         // 4. Boundary conditions
         FdmBoundaryConditionSet boundaries;
-        if (   arguments_.touchType == Touch::OneTouchUp
+        if (arguments_.touchType == Touch::OneTouchUp
             || arguments_.touchType == Touch::DoubleOneTouch) {
             if (!arguments_.payoffAtExpiry){
                 boundaries.push_back(
@@ -127,7 +146,7 @@ namespace QuantLib {
             }
         }
 
-        if (   arguments_.touchType == Touch::OneTouchDown
+        if (arguments_.touchType == Touch::OneTouchDown
             || arguments_.touchType == Touch::DoubleOneTouch) {
             boundaries.push_back(
                 ext::make_shared<FdmDirichletBoundary>(mesher, arguments_.rebateLow[0], 0,

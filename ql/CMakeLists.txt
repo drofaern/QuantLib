@@ -499,6 +499,7 @@ set(QuantLib_SRC
     methods/finitedifferences/stepconditions/fdmamericanstepcondition.cpp
     methods/finitedifferences/stepconditions/fdmarithmeticaveragecondition.cpp
     methods/finitedifferences/stepconditions/fdmbermudanstepcondition.cpp
+    methods/finitedifferences/stepconditions/fdmknockoutcondition.cpp
     methods/finitedifferences/stepconditions/fdmsimplestoragecondition.cpp
     methods/finitedifferences/stepconditions/fdmsimpleswingcondition.cpp
     methods/finitedifferences/stepconditions/fdmsnapshotcondition.cpp
@@ -1692,6 +1693,7 @@ set(QuantLib_HDR
     methods/finitedifferences/stepconditions/fdmamericanstepcondition.hpp
     methods/finitedifferences/stepconditions/fdmarithmeticaveragecondition.hpp
     methods/finitedifferences/stepconditions/fdmbermudanstepcondition.hpp
+    methods/finitedifferences/stepconditions/fdmknockoutcondition.hpp
     methods/finitedifferences/stepconditions/fdmsimplestoragecondition.hpp
     methods/finitedifferences/stepconditions/fdmsimpleswingcondition.hpp
     methods/finitedifferences/stepconditions/fdmsnapshotcondition.hpp

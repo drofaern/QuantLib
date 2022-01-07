@@ -30,11 +30,14 @@ namespace QuantLib {
                     std::vector<Real> barrierLow,
                     std::vector<Real> rebateHigh,
                     std::vector<Real> rebateLow,
+                    std::vector<Date> obsHigh,
+                    std::vector<Date> obsLow,
                     bool payoffAtExpiry,
                     const ext::shared_ptr<Exercise>& exercise)
     : OneAssetOption(ext::shared_ptr<StrikedTypePayoff>(new PlainVanillaPayoff(Option::Type::Call, 1e9)), exercise),
       touchType_(touchType), barrierHigh_(std::move(barrierHigh)), barrierLow_(std::move(barrierLow)),
-      rebateHigh_(std::move(rebateHigh)), rebateLow_(std::move(rebateLow)), payoffAtExpiry_(payoffAtExpiry){}
+      rebateHigh_(std::move(rebateHigh)), obsHigh_(std::move(obsHigh)), obsLow_(std::move(obsLow)),
+      rebateLow_(std::move(rebateLow)), payoffAtExpiry_(payoffAtExpiry){}
 
     void TouchOption::setupArguments(PricingEngine::arguments* args) const {
 
@@ -47,6 +50,8 @@ namespace QuantLib {
         moreArgs->barrierLow = std::move(barrierLow_);
         moreArgs->rebateHigh = std::move(rebateHigh_);
         moreArgs->rebateLow = std::move(rebateLow_);
+        moreArgs->obsHigh = std::move(obsHigh_);
+        moreArgs->obsLow = std::move(obsLow_);
         moreArgs->payoffAtExpiry = payoffAtExpiry_;
     }
 
