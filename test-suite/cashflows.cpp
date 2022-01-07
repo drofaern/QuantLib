@@ -24,6 +24,7 @@
 #include <ql/cashflows/fixedratecoupon.hpp>
 #include <ql/cashflows/floatingratecoupon.hpp>
 #include <ql/cashflows/iborcoupon.hpp>
+#include <ql/cashflows/overnightindexedcoupon.hpp>
 #include <ql/cashflows/couponpricer.hpp>
 #include <ql/termstructures/volatility/optionlet/constantoptionletvol.hpp>
 #include <ql/quotes/simplequote.hpp>
@@ -32,8 +33,9 @@
 #include <ql/time/schedule.hpp>
 #include <ql/indexes/ibor/euribor.hpp>
 #include <ql/indexes/ibor/usdlibor.hpp>
+#include <ql/indexes/ibor/sofr.hpp>
 #include <ql/settings.hpp>
-
+#include <iomanip>
 
 using namespace QuantLib;
 using namespace boost::unit_test_framework;
@@ -503,21 +505,20 @@ void CashFlowsTest::testPartialScheduleLegConstruction() {
     BOOST_CHECK_EQUAL(lastCpnF3->referencePeriodStart(), Date(25, Sep, 2020));
     BOOST_CHECK_EQUAL(lastCpnF3->referencePeriodEnd(), Date(30, Sep, 2020));
 }
-
+    
 test_suite* CashFlowsTest::suite() {
     auto* suite = BOOST_TEST_SUITE("Cash flows tests");
     suite->add(QUANTLIB_TEST_CASE(&CashFlowsTest::testSettings));
     suite->add(QUANTLIB_TEST_CASE(&CashFlowsTest::testAccessViolation));
     suite->add(QUANTLIB_TEST_CASE(&CashFlowsTest::testDefaultSettlementDate));
     suite->add(QUANTLIB_TEST_CASE(&CashFlowsTest::testExCouponDates));
-    if (IborCoupon::usingAtParCoupons())
+
+    if (IborCoupon::Settings::instance().usingAtParCoupons())
         suite->add(QUANTLIB_TEST_CASE(&CashFlowsTest::testNullFixingDays));
 
-    suite->add(QUANTLIB_TEST_CASE(
-                             &CashFlowsTest::testIrregularFirstCouponReferenceDatesAtEndOfMonth));
-    suite->add(QUANTLIB_TEST_CASE(
-                             &CashFlowsTest::testIrregularLastCouponReferenceDatesAtEndOfMonth));
-    suite->add(QUANTLIB_TEST_CASE(
-                             &CashFlowsTest::testPartialScheduleLegConstruction));
+    suite->add(QUANTLIB_TEST_CASE(&CashFlowsTest::testIrregularFirstCouponReferenceDatesAtEndOfMonth));
+    suite->add(QUANTLIB_TEST_CASE(&CashFlowsTest::testIrregularLastCouponReferenceDatesAtEndOfMonth));
+    suite->add(QUANTLIB_TEST_CASE(&CashFlowsTest::testPartialScheduleLegConstruction));
+
     return suite;
 }
