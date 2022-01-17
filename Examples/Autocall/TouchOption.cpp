@@ -186,8 +186,9 @@ int main(int, char* []) {
 
             std::vector<Date> obs;
 
-            TouchOption opt(value.touchType, value.barrierHigh, value.barrierLow, value.rebateHigh, value.rebateLow, 
-              fixingDates == 0 ? obs : fixingDates->dates(), obs, value.payAtExpiry, amExercise);
+            TouchOption opt(value.touchType, value.barrierHigh, value.barrierLow, value.rebateHigh,
+                            value.rebateLow, fixingDates == nullptr ? obs : fixingDates->dates(),
+                            obs, value.payAtExpiry, amExercise);
 
             opt.setPricingEngine(engine);
 
