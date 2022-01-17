@@ -30,7 +30,7 @@
 
 namespace QuantLib {
 
-    std::string payoffTypeToString(const ext::shared_ptr<Payoff>& h) {
+    inline std::string payoffTypeToString(const ext::shared_ptr<Payoff>& h) {
 
         CHECK_DOWNCAST(PlainVanillaPayoff, "plain-vanilla");
         CHECK_DOWNCAST(CashOrNothingPayoff, "cash-or-nothing");
@@ -45,7 +45,7 @@ namespace QuantLib {
     }
 
 
-    std::string exerciseTypeToString(const ext::shared_ptr<Exercise>& h) {
+    inline std::string exerciseTypeToString(const ext::shared_ptr<Exercise>& h) {
 
         CHECK_DOWNCAST(EuropeanExercise, "European");
         CHECK_DOWNCAST(AmericanExercise, "American");
@@ -55,69 +55,58 @@ namespace QuantLib {
     }
 
 
-    ext::shared_ptr<YieldTermStructure>
-    flatRate(const Date& today,
-             const ext::shared_ptr<Quote>& forward,
-             const DayCounter& dc) {
+    inline ext::shared_ptr<YieldTermStructure>
+    flatRate(const Date& today, const ext::shared_ptr<Quote>& forward, const DayCounter& dc) {
         return ext::shared_ptr<YieldTermStructure>(
                           new FlatForward(today, Handle<Quote>(forward), dc));
     }
 
-    ext::shared_ptr<YieldTermStructure>
+    inline ext::shared_ptr<YieldTermStructure>
     flatRate(const Date& today, Rate forward, const DayCounter& dc) {
         return flatRate(
                today, ext::shared_ptr<Quote>(new SimpleQuote(forward)), dc);
     }
 
-    ext::shared_ptr<YieldTermStructure>
-    flatRate(const ext::shared_ptr<Quote>& forward,
-             const DayCounter& dc) {
+    inline ext::shared_ptr<YieldTermStructure> flatRate(const ext::shared_ptr<Quote>& forward,
+                                                        const DayCounter& dc) {
         return ext::shared_ptr<YieldTermStructure>(
               new FlatForward(0, NullCalendar(), Handle<Quote>(forward), dc));
     }
 
-    ext::shared_ptr<YieldTermStructure>
-    flatRate(Rate forward, const DayCounter& dc) {
+    inline ext::shared_ptr<YieldTermStructure> flatRate(Rate forward, const DayCounter& dc) {
         return flatRate(ext::shared_ptr<Quote>(new SimpleQuote(forward)),
                         dc);
     }
 
 
-    ext::shared_ptr<BlackVolTermStructure>
-    flatVol(const Date& today,
-            const ext::shared_ptr<Quote>& vol,
-            const DayCounter& dc) {
+    inline ext::shared_ptr<BlackVolTermStructure>
+    flatVol(const Date& today, const ext::shared_ptr<Quote>& vol, const DayCounter& dc) {
         return ext::shared_ptr<BlackVolTermStructure>(new
             BlackConstantVol(today, NullCalendar(), Handle<Quote>(vol), dc));
     }
 
-    ext::shared_ptr<BlackVolTermStructure>
-    flatVol(const Date& today,
-            const Calendar cal,
-            const ext::shared_ptr<Quote>& vol,
-            const DayCounter& dc) {
+    inline ext::shared_ptr<BlackVolTermStructure> flatVol(const Date& today,
+                                                          const Calendar& cal,
+                                                          const ext::shared_ptr<Quote>& vol,
+                                                          const DayCounter& dc) {
         return ext::shared_ptr<BlackVolTermStructure>(new
             BlackConstantVol(today, cal, Handle<Quote>(vol), dc));
     }
 
-    ext::shared_ptr<BlackVolTermStructure>
-    flatVol(const Date& today, Volatility vol,
-            const DayCounter& dc) {
+    inline ext::shared_ptr<BlackVolTermStructure>
+    flatVol(const Date& today, Volatility vol, const DayCounter& dc) {
         return flatVol(today,
                        ext::shared_ptr<Quote>(new SimpleQuote(vol)),
                        dc);
     }
 
-    ext::shared_ptr<BlackVolTermStructure>
-    flatVol(const ext::shared_ptr<Quote>& vol,
-            const DayCounter& dc) {
+    inline ext::shared_ptr<BlackVolTermStructure> flatVol(const ext::shared_ptr<Quote>& vol,
+                                                          const DayCounter& dc) {
         return ext::shared_ptr<BlackVolTermStructure>(new
             BlackConstantVol(0, NullCalendar(), Handle<Quote>(vol), dc));
     }
 
-    ext::shared_ptr<BlackVolTermStructure>
-    flatVol(Volatility vol,
-            const DayCounter& dc) {
+    inline ext::shared_ptr<BlackVolTermStructure> flatVol(Volatility vol, const DayCounter& dc) {
         return flatVol(ext::shared_ptr<Quote>(new SimpleQuote(vol)), dc);
     }
 
