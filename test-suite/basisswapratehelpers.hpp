@@ -1,7 +1,7 @@
 /* -*- mode: c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 /*
- Copyright (C) 2009, 2012 StatPro Italia srl
+ Copyright (C) 2021 StatPro Italia srl
 
  This file is part of QuantLib, a free-software/open-source library
  for financial quantitative analysts and developers - http://quantlib.org/
@@ -17,24 +17,22 @@
  FOR A PARTICULAR PURPOSE.  See the license for more details.
 */
 
-#ifndef quantlib_test_cashflows_hpp
-#define quantlib_test_cashflows_hpp
+#ifndef quantlib_test_basisswapratehelpers_hpp
+#define quantlib_test_basisswapratehelpers_hpp
 
 #include <boost/test/unit_test.hpp>
 
-class CashFlowsTest {
+/* remember to document new and/or updated tests in the Doxygen
+   comment block of the corresponding class */
+
+class BasisSwapRateHelpersTest {
   public:
-    static void testSettings();
-    static void testAccessViolation();
-    static void testDefaultSettlementDate();
-    static void testExCouponDates();
-    static void testNullFixingDays();
-    static void testIrregularFirstCouponReferenceDatesAtEndOfMonth();
-    static void testIrregularLastCouponReferenceDatesAtEndOfMonth();
-    static void testPartialScheduleLegConstruction();
-    static void testFixedIborCouponWithoutForecastCurve();
+    static void testIborIborBaseCurveBootstrap();
+    static void testIborIborOtherCurveBootstrap();
+    static void testOvernightIborBootstrap();
+    static void testOvernightIborBootstrapWithDiscountCurve();
+
     static boost::unit_test_framework::test_suite* suite();
 };
-
 
 #endif
