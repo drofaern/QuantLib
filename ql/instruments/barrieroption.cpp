@@ -26,7 +26,6 @@
 #include <memory>
 
 namespace QuantLib {
-
     BarrierOption::BarrierOption(
         Barrier::Type barrierType,
         Real barrier,
@@ -34,7 +33,17 @@ namespace QuantLib {
         const ext::shared_ptr<StrikedTypePayoff>& payoff,
         const ext::shared_ptr<Exercise>& exercise)
     : OneAssetOption(payoff, exercise),
-      barrierType_(barrierType), barrier_(barrier), rebate_(rebate) {}
+      barrierType_(barrierType), barrier_(barrier), rebate_(rebate), payAtExpiry_(true) {}
+
+    BarrierOption::BarrierOption(
+        Barrier::Type barrierType,
+        Real barrier,
+        Real rebate,
+        const ext::shared_ptr<StrikedTypePayoff>& payoff,
+        const ext::shared_ptr<Exercise>& exercise,
+        bool payAtExpiry)
+    : OneAssetOption(payoff, exercise),
+      barrierType_(barrierType), barrier_(barrier), rebate_(rebate), payAtExpiry_(payAtExpiry) {}
 
     void BarrierOption::setupArguments(PricingEngine::arguments* args) const {
 
@@ -42,6 +51,7 @@ namespace QuantLib {
 
         auto* moreArgs = dynamic_cast<BarrierOption::arguments*>(args);
         QL_REQUIRE(moreArgs != nullptr, "wrong argument type");
+        moreArgs->payAtExpiry = payAtExpiry_;
         moreArgs->barrierType = barrierType_;
         moreArgs->barrier = barrier_;
         moreArgs->rebate = rebate_;
@@ -102,6 +112,9 @@ namespace QuantLib {
             break;
           default:
             QL_FAIL("unknown type");
+        }
+        if (!payAtExpiry){
+          QL_REQUIRE(barrierType == Barrier::DownIn || barrierType == Barrier::UpIn, "invalid barrier type given");
         }
 
         QL_REQUIRE(barrier != Null<Real>(), "no barrier given");

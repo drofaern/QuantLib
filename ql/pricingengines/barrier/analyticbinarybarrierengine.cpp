@@ -23,34 +23,32 @@
 #include <ql/pricingengines/barrier/analyticbinarybarrierengine.hpp>
 #include <ql/pricingengines/vanilla/analyticeuropeanengine.hpp>
 #include <utility>
+#include <iostream>
+
+#define log_S_X   (std::log(spot()/strike()))
+#define log_S_H   (std::log(spot()/barrier()))
+#define log_H_S   (std::log(barrier()/spot()))
+#define log_H2_SX (std::log(barrier()*barrier()/(spot()*strike())))
+#define H_S_2mu   (std::pow(barrier()/spot(), 2*mu()))
+#define H_S_2mu_1 (std::pow(barrier()/spot(), 2*(mu()+1)))
+
+
 
 namespace QuantLib {
-
-    // calc helper object 
-    class AnalyticBinaryBarrierEngine_helper
-    {
-    
-    public:
-        AnalyticBinaryBarrierEngine_helper(
-             const ext::shared_ptr<GeneralizedBlackScholesProcess>& process,
-             const ext::shared_ptr<StrikedTypePayoff> &payoff,
-             const ext::shared_ptr<AmericanExercise> &exercise,
-             const BarrierOption::arguments &arguments):
-        process_(process),
-        payoff_(payoff),
-        exercise_(exercise),
-        arguments_(arguments)
-        {
+  std::string barrierTypeToString(Barrier::Type type) {
+        switch(type){
+          case Barrier::DownIn:
+            return std::string("Down-and-in");
+          case Barrier::UpIn:
+            return std::string("Up-and-in");
+          case Barrier::DownOut:
+            return std::string("Down-and-out");
+          case Barrier::UpOut:
+            return std::string("Up-and-out");
+          default:
+            QL_FAIL("unknown exercise type");
         }
-
-        Real payoffAtExpiry(Real spot, Real variance, Real discount);
-    private:
-        const ext::shared_ptr<GeneralizedBlackScholesProcess>& process_;
-        const ext::shared_ptr<StrikedTypePayoff> &payoff_;
-        const ext::shared_ptr<AmericanExercise> &exercise_;
-        const BarrierOption::arguments &arguments_;
-    };
-
+    }
 
     AnalyticBinaryBarrierEngine::AnalyticBinaryBarrierEngine(
         ext::shared_ptr<GeneralizedBlackScholesProcess> process)
@@ -59,15 +57,6 @@ namespace QuantLib {
     }
 
     void AnalyticBinaryBarrierEngine::calculate() const {
-
-        ext::shared_ptr<AmericanExercise> ex =
-            ext::dynamic_pointer_cast<AmericanExercise>(arguments_.exercise);
-        QL_REQUIRE(ex, "non-American exercise given");
-        QL_REQUIRE(ex->payoffAtExpiry(), "payoff must be at expiry");
-        QL_REQUIRE(ex->dates()[0] <=
-                   process_->blackVolatility()->referenceDate(),
-                   "American option with window exercise not handled yet");
-
         ext::shared_ptr<StrikedTypePayoff> payoff =
             ext::dynamic_pointer_cast<StrikedTypePayoff>(arguments_.payoff);
         QL_REQUIRE(payoff, "non-striked payoff given");
@@ -75,9 +64,6 @@ namespace QuantLib {
         Real spot = process_->stateVariable()->value();
         QL_REQUIRE(spot > 0.0, "negative or null underlying given");
 
-        Real variance =
-            process_->blackVolatility()->blackVariance(ex->lastDate(),
-                                                       payoff->strike());
         Real barrier = arguments_.barrier;
         QL_REQUIRE(barrier>0.0,
                    "positive barrier value required");
@@ -118,207 +104,307 @@ namespace QuantLib {
             results_.rho = opt.rho();
             results_.dividendRho = opt.dividendRho();
             return;
-        }
+        }        
+        Option::Type type   = payoff->optionType();
+        
+        bool cashOrNothing = false;
+        bool assetOrNothing = false;
+        bool payAtExpiry = arguments_.payAtExpiry;
 
-        Rate riskFreeDiscount =
-            process_->riskFreeRate()->discount(ex->lastDate());
-
-        AnalyticBinaryBarrierEngine_helper helper(process_,
-           payoff, ex, arguments_);
-        results_.value = helper.payoffAtExpiry(spot, variance, riskFreeDiscount);
-    }
-
-    Real AnalyticBinaryBarrierEngine_helper::payoffAtExpiry(
-         Real spot, Real variance, Real discount)
-    {
-        Rate dividendDiscount =
-            process_->dividendYield()->discount(exercise_->lastDate());
-
-        QL_REQUIRE(spot>0.0,
-                   "positive spot value required");
-
-        QL_REQUIRE(discount>0.0,
-                   "positive discount required");
-
-        QL_REQUIRE(dividendDiscount>0.0,
-                   "positive dividend discount required");
-
-        QL_REQUIRE(variance>=0.0,
-                   "negative variance not allowed");
-
-        Option::Type type   = payoff_->optionType();
-        Real strike = payoff_->strike();
-        Real barrier = arguments_.barrier;
-        QL_REQUIRE(barrier>0.0,
-                   "positive barrier value required");
-        Barrier::Type barrierType = arguments_.barrierType;
-
-        Real stdDev = std::sqrt(variance);
-        Real mu = std::log(dividendDiscount/discount)/variance - 0.5;
-        Real K = 0;
-
-        // binary cash-or-nothing payoff?
         ext::shared_ptr<CashOrNothingPayoff> coo =
-            ext::dynamic_pointer_cast<CashOrNothingPayoff>(payoff_);
-        if (coo != nullptr) {
-            K = coo->cashPayoff();
+            ext::dynamic_pointer_cast<CashOrNothingPayoff>(arguments_.payoff);
+        if (coo != nullptr) cashOrNothing = true; else assetOrNothing = true;
+
+        Real phi;
+        Real eta;
+        Real result;
+
+        // case 1: Down-and-in cash-(at-hit)-or-nothing
+        // case 2: Up-and-in cash-(at-hit)-or-nothing
+        // case 3: Down-and-in asset-(at-hit)-or-nothing (K=H)
+        // case 4: Up-and-in asset-(at-hit)-or-nothing (K=H)
+        if (!payAtExpiry){
+          if (barrierType == Barrier::DownIn)
+            eta = 1;
+          if (barrierType == Barrier::UpIn)
+            eta = -1;
+          result = A5(eta);
+        }
+        // following cases degenerate to call with zero strike vice versa
+        // case 5: Down-and-in cash-or-nothing
+        // case 6: Up-and-in cash-or-nothing
+        // case 7: Down-and-in asset-or-nothing
+        // case 8: Up-and-in asset-or-nothing
+        // case 9: Down-and-out cash-or-nothing
+        // case 10: Up-and-out cash-or-nothing
+        // case 11: Down-and-out asset-or-nothing
+        // case 12: Up-and-out asset-or-nothing
+
+        // case 13: Down-and-in cash-or-nothing call
+        else if (cashOrNothing && barrierType == Barrier::DownIn && type == Option::Call){
+           if (strike() >= barrier) {
+              phi = 1;
+              result = B3(phi);
+            } else {
+              eta = 1; phi = 1;
+              result = B1(phi) - B2(phi) + B4(eta);
+            }
+        }
+        // case 14: Up-and-in cash-or-nothing call
+        else if (cashOrNothing && barrierType == Barrier::UpIn && type == Option::Call){
+           if (strike() >= barrier) {
+              phi = 1;
+              result = B1(phi); // wrong in VBA
+            } else {
+              eta = -1; phi = 1;
+              result = B2(phi) - B3(eta) + B4(eta);
+            }
+        }
+        // case 15: Down-and-in asset-or-nothing call
+        else if (assetOrNothing && barrierType == Barrier::DownIn && type == Option::Call){
+           if (strike() >= barrier) {
+              eta = 1;
+              result = A3(eta);
+            } else {
+              eta = 1; phi = 1;
+              result = A1(phi) - A2(phi) + A4(eta);
+            }
+        }
+        // case 16: Up-and-in asset-or-nothing call
+        else if (assetOrNothing && barrierType == Barrier::UpIn && type == Option::Call){
+           if (strike() >= barrier) {
+              phi = 1;
+              result = A1(phi);
+            } else {
+              eta = -1; phi = 1;
+              result = A2(phi) - A3(eta) + A4(eta);
+            }
+        }
+        // case 17: Down-and-in cash-or-nothing put
+        else if (cashOrNothing && barrierType == Barrier::DownIn && type == Option::Put){
+           if (strike() >= barrier) {
+              eta = 1; phi = -1;
+              result = B2(phi) - B3(eta) + B4(eta);
+            } else {
+              phi = -1;
+              result = B1(phi);
+            }
+        }
+        // case 18: Up-and-in cash-or-nothing put
+        else if (cashOrNothing && barrierType == Barrier::UpIn && type == Option::Put){
+           if (strike() >= barrier) {
+              eta = -1; phi = -1;
+              result = B1(phi) - B2(phi) + B4(eta);
+            } else {
+              phi = -1;
+              result = B3(phi);
+            }
+        }
+        // case 19: Down-and-in asset-or-nothing put
+        else if (assetOrNothing && barrierType == Barrier::DownIn && type == Option::Put){
+           if (strike() >= barrier) {
+              eta = 1; phi = -1;
+              result = A2(phi) - A3(eta) + A4(eta);
+            } else {
+              phi = -1;
+              result = A1(phi);
+            }
+        }
+        // case 20: Up-and-in asset-or-nothing put
+        else if (assetOrNothing && barrierType == Barrier::UpIn && type == Option::Put){
+           if (strike() >= barrier) {
+              eta = -1; phi = -1;
+              result = A1(phi) - A2(phi) + A4(eta);  // wrong in book and VBA?????
+            } else {
+              eta = -1;
+              result = A3(eta);
+            }
+        }
+        // case 21: Down-and-out cash-or-nothing call
+        else if (cashOrNothing && barrierType == Barrier::DownOut && type == Option::Call){  
+           if (strike() >= barrier) {
+              eta = 1; phi = 1;
+              result = B1(phi) - B3(eta);
+            } else {
+              eta = 1; phi = 1;
+              result = B2(phi) - B4(eta);
+            }
+        }
+        // case 22: Up-and-out cash-or-nothing call
+        else if (cashOrNothing && barrierType == Barrier::UpOut && type == Option::Call){
+           if (strike() >= barrier) {
+              result = 0;
+            } else {
+              eta = -1; phi = 1;
+              result = B1(phi) - B2(phi) + B3(eta) - B4(eta);
+            }
+        }
+        // case 23: Down-and-out asset-or-nothing call
+        else if (assetOrNothing && barrierType == Barrier::DownOut && type == Option::Call){
+           if (strike() >= barrier) {
+              eta = 1; phi = 1;
+              result = A1(phi) - A3(eta);
+            } else {
+              eta = 1; phi = 1;
+              result = A2(phi) - A4(eta);
+            }
+        }
+        // case 24: Up-and-out asset-or-nothing call
+        else if (assetOrNothing && barrierType == Barrier::UpOut && type == Option::Call){
+           if (strike() >= barrier) {
+              result = 0;
+            } else {
+              eta = -1; phi = 1;
+              result = A1(phi) - A2(phi) + A3(eta) - A4(eta);
+            }
+        }
+        // case 25: Down-and-out cash-or-nothing put
+        else if (cashOrNothing && barrierType == Barrier::DownOut && type == Option::Put){
+           if (strike() >= barrier) {
+              eta = 1; phi = -1;
+              result = B1(phi) - B2(phi) + B3(eta) - B4(eta);
+            } else {
+              result = 0;
+            }
+        }
+        // case 26: Up-and-out cash-or-nothing put
+        else if (cashOrNothing && barrierType == Barrier::UpOut && type == Option::Put){
+           if (strike() >= barrier) {
+              eta = -1; phi = -1;
+              result = B2(phi) - B4(eta);
+            } else {
+              eta = -1; phi = -1;
+              result = B1(phi) - B3(eta);
+            }
+        }
+        // case 27: Down-and-out asset-or-nothing put
+        else if (assetOrNothing && barrierType == Barrier::DownOut && type == Option::Put){
+           if (strike() >= barrier) {
+              eta = 1; phi = -1;
+              result = A1(phi) - A2(phi) + A3(eta) - A4(eta);
+            } else {
+              result = 0;
+            }
+        }
+        // case 28: Up-and-out asset-or-nothing put
+        else if (assetOrNothing && barrierType == Barrier::UpOut && type == Option::Put){
+           if (strike() >= barrier) {
+              eta = -1; phi = -1;
+              result = A2(phi) - A4(eta);
+            } else {
+              eta = -1; phi = -1;
+              result = A1(phi) - A3(eta);
+            }
+        }
+        else {
+           QL_FAIL("Not supported");
         }
 
-        // binary asset-or-nothing payoff?
-        ext::shared_ptr<AssetOrNothingPayoff> aoo =
-            ext::dynamic_pointer_cast<AssetOrNothingPayoff>(payoff_);
-        if (aoo != nullptr) {
-            mu += 1.0; 
-            K = spot * dividendDiscount / discount; // forward
-        }
-
-        Real log_S_X = std::log(spot/strike);
-        Real log_S_H = std::log(spot/barrier);
-        Real log_H_S = std::log(barrier/spot);
-        Real log_H2_SX = std::log(barrier*barrier/(spot*strike));
-        Real H_S_2mu = std::pow(barrier/spot, 2*mu);
-
-        Real eta = (barrierType == Barrier::DownIn ||
-                    barrierType == Barrier::DownOut ? 1.0 : -1.0);
-        Real phi = (type == Option::Call ? 1.0 : -1.0);
-
-        Real x1, x2, y1, y2;
-        Real cum_x1, cum_x2, cum_y1, cum_y2;
-        if (variance>=QL_EPSILON) {
-
-            // we calculate using mu*stddev instead of (mu+1)*stddev
-            // because cash-or-nothing don't need it. asset-or-nothing
-            // mu is really mu+1
-            x1 = phi*(log_S_X/stdDev + mu*stdDev);
-            x2 = phi*(log_S_H/stdDev + mu*stdDev);
-            y1 = eta*(log_H2_SX/stdDev + mu*stdDev);
-            y2 = eta*(log_H_S/stdDev + mu*stdDev);
-
-            CumulativeNormalDistribution f;
-            cum_x1 = f(x1);
-            cum_x2 = f(x2);
-            cum_y1 = f(y1);
-            cum_y2 = f(y2);
-        } else {
-            if (log_S_X>0)
-                cum_x1= 1.0;
-            else
-                cum_x1= 0.0;
-            if (log_S_H>0)
-                cum_x2= 1.0;
-            else
-                cum_x2= 0.0;
-            if (log_H2_SX>0)
-                cum_y1= 1.0;
-            else
-                cum_y1= 0.0;
-            if (log_H_S>0)
-                cum_y2= 1.0;
-            else
-                cum_y2= 0.0;
-        }
-
-        Real alpha = 0;
-
-        switch (barrierType) {
-            case Barrier::DownIn:
-               if (type == Option::Call) {
-                  // down-in and call
-                  if (strike >= barrier) {
-                     // B3 (eta=1, phi=1)
-                     alpha = H_S_2mu * cum_y1;  
-                  } else {
-                     // B1-B2+B4 (eta=1, phi=1)
-                     alpha = cum_x1 - cum_x2 + H_S_2mu * cum_y2; 
-                  }
-               }
-               else {
-                  // down-in and put 
-                  if (strike >= barrier) {
-                     // B2-B3+B4 (eta=1, phi=-1)
-                     alpha = cum_x2 + H_S_2mu*(-cum_y1 + cum_y2);
-                  } else {
-                     // B1 (eta=1, phi=-1)
-                     alpha = cum_x1;
-                  }
-               }
-               break;
-
-            case Barrier::UpIn:
-               if (type == Option::Call) {
-                  // up-in and call
-                  if (strike >= barrier) {
-                     // B1 (eta=-1, phi=1)
-                     alpha = cum_x1;  
-                  } else {
-                     // B2-B3+B4 (eta=-1, phi=1)
-                     alpha = cum_x2 + H_S_2mu * (-cum_y1 + cum_y2);
-                  }
-               }
-               else {
-                  // up-in and put 
-                  if (strike >= barrier) {
-                     // B1-B2+B4 (eta=-1, phi=-1)
-                     alpha = cum_x1 - cum_x2 + H_S_2mu * cum_y2;
-                  } else {
-                     // B3 (eta=-1, phi=-1)
-                     alpha = H_S_2mu * cum_y1;  
-                  }
-               }
-               break;
-
-            case Barrier::DownOut:
-               if (type == Option::Call) {
-                  // down-out and call
-                  if (strike >= barrier) {
-                     // B1-B3 (eta=1, phi=1)
-                     alpha = cum_x1 - H_S_2mu * cum_y1; 
-                  } else {
-                     // B2-B4 (eta=1, phi=1)
-                     alpha = cum_x2 - H_S_2mu * cum_y2; 
-                  }
-               }
-               else {
-                  // down-out and put 
-                  if (strike >= barrier) {
-                     // B1-B2+B3-B4 (eta=1, phi=-1)
-                     alpha = cum_x1 - cum_x2 + H_S_2mu * (cum_y1-cum_y2);
-                  } else {
-                     // always 0
-                     alpha = 0;  
-                  }
-               }
-               break;
-            case Barrier::UpOut:
-               if (type == Option::Call) {
-                  // up-out and call
-                  if (strike >= barrier) {
-                     // always 0
-                     alpha = 0;  
-                  } else {
-                     // B1-B2+B3-B4 (eta=-1, phi=1)
-                     alpha = cum_x1 - cum_x2 + H_S_2mu * (cum_y1-cum_y2);
-                  }
-               }
-               else {
-                  // up-out and put 
-                  if (strike >= barrier) {
-                     // B2-B4 (eta=-1, phi=-1)
-                     alpha = cum_x2 - H_S_2mu * cum_y2;
-                  } else {
-                     // B1-B3 (eta=-1, phi=-1)
-                     alpha = cum_x1 - H_S_2mu * cum_y1;
-                  }
-               }
-               break;
-            default:
-                QL_FAIL("invalid barrier type");
-        }
-
-        return discount * K * alpha;
+        results_.value = result;
+        return;
     }
 
+    Real AnalyticBinaryBarrierEngine::variance() const {
+        return process_->blackVolatility()->blackVariance(arguments_.exercise->lastDate(),
+            strike());
+    }
 
+    Real AnalyticBinaryBarrierEngine::stdDeviation() const {
+        return std::sqrt(process_->blackVolatility()->blackVariance(
+                        arguments_.exercise->lastDate(),
+                        strike()));
+    }
 
+    Real AnalyticBinaryBarrierEngine::barrier() const {
+        QL_REQUIRE(arguments_.barrier>0.0,
+                   "positive barrier value required");
+        return arguments_.barrier;
+    }
+
+    Real AnalyticBinaryBarrierEngine::strike() const {
+         ext::shared_ptr<StrikedTypePayoff> payoff =
+            ext::dynamic_pointer_cast<StrikedTypePayoff>(arguments_.payoff);
+        QL_REQUIRE(payoff, "non-striked type payoff given");
+        return payoff->strike();
+    }
+
+    Real AnalyticBinaryBarrierEngine::rebate() const {
+        return arguments_.rebate;
+    }
+
+    DiscountFactor AnalyticBinaryBarrierEngine::riskFreeDiscount() const {
+        return process_->riskFreeRate()->discount(
+                    arguments_.exercise->lastDate());
+    }
+
+    DiscountFactor AnalyticBinaryBarrierEngine::dividendDiscount() const {
+        return process_->dividendYield()->discount(
+                    arguments_.exercise->lastDate());
+    }
+
+    Real AnalyticBinaryBarrierEngine::spot() const {
+      return process_->x0();
+    }
+
+    Real AnalyticBinaryBarrierEngine::A1(Real phi) const{
+         return spot() * dividendDiscount()*f_(phi*(log_S_X/stdDeviation() + (mu()+1)*stdDeviation()));
+    }
+
+    Real AnalyticBinaryBarrierEngine::A2(Real phi) const{
+         return spot()* dividendDiscount()*f_(phi*(log_S_H/stdDeviation() + (mu()+1)*stdDeviation()));
+    }
+    
+    Real AnalyticBinaryBarrierEngine::A3(Real eta) const{                
+         return spot()* dividendDiscount()* H_S_2mu_1 * f_(eta * (log_H2_SX/stdDeviation() + (mu()+1)*stdDeviation()));
+    }
+
+    Real AnalyticBinaryBarrierEngine::A4(Real eta) const{
+         return spot()* dividendDiscount()* H_S_2mu_1 * f_(eta*(log_H_S/stdDeviation() + (mu()+1)*stdDeviation()));
+    }
+
+    Real AnalyticBinaryBarrierEngine::A5(Real eta) const{
+         ext::shared_ptr<CashOrNothingPayoff> coo =
+            ext::dynamic_pointer_cast<CashOrNothingPayoff>(arguments_.payoff);
+         Real K;
+         if (coo != nullptr)
+            K = coo->cashPayoff();
+         else
+            K = barrier();
+         Real lambda = std::sqrt(mu() * mu() + 2 * std::log(riskFreeDiscount()) / (stdDeviation() * stdDeviation()));
+         return K * (std::pow((barrier()/ strike()), mu() + lambda) * f_(eta*(log_H_S/stdDeviation() + lambda*stdDeviation())) +
+              std::pow((barrier()/ strike()), mu() - lambda) * f_(eta*(log_H_S/stdDeviation() + lambda*stdDeviation()) - 2*eta*lambda*stdDeviation()));
+    }
+
+    Real AnalyticBinaryBarrierEngine::B1(Real phi) const {
+         ext::shared_ptr<CashOrNothingPayoff> coo =
+            ext::dynamic_pointer_cast<CashOrNothingPayoff>(arguments_.payoff);
+         QL_REQUIRE(coo, "non-cash-or-nothing payoff given");
+         return coo->cashPayoff()* riskFreeDiscount()*f_(phi*(log_S_X/stdDeviation() + mu()*stdDeviation()));
+    }
+
+    Real AnalyticBinaryBarrierEngine::B2(Real phi) const {
+         ext::shared_ptr<CashOrNothingPayoff> coo =
+            ext::dynamic_pointer_cast<CashOrNothingPayoff>(arguments_.payoff);
+         QL_REQUIRE(coo, "non-cash-or-nothing payoff given");
+         return coo->cashPayoff()* riskFreeDiscount()*f_(phi*(log_S_H/stdDeviation() + mu()*stdDeviation()));
+    }
+    
+    Real AnalyticBinaryBarrierEngine::B3(Real eta) const {
+         ext::shared_ptr<CashOrNothingPayoff> coo =
+            ext::dynamic_pointer_cast<CashOrNothingPayoff>(arguments_.payoff);
+         QL_REQUIRE(coo, "non-cash-or-nothing payoff given");
+         return coo->cashPayoff()* riskFreeDiscount()* H_S_2mu * f_(eta * (log_H2_SX/stdDeviation() + mu()*stdDeviation()));
+    }
+    
+    Real AnalyticBinaryBarrierEngine::B4(Real eta) const {
+         ext::shared_ptr<CashOrNothingPayoff> coo =
+            ext::dynamic_pointer_cast<CashOrNothingPayoff>(arguments_.payoff);
+         QL_REQUIRE(coo, "non-cash-or-nothing payoff given");
+         return coo->cashPayoff()* riskFreeDiscount()* H_S_2mu * f_(eta*(log_H_S/stdDeviation() + mu()*stdDeviation()));
+    }
+
+    Rate AnalyticBinaryBarrierEngine::mu() const {
+        return std::log(dividendDiscount()/riskFreeDiscount())/variance() - 0.5;
+    }
 }
 

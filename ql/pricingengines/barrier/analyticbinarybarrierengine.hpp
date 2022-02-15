@@ -26,6 +26,7 @@
 
 #include <ql/instruments/barrieroption.hpp>
 #include <ql/processes/blackscholesprocess.hpp>
+#include <ql/math/distributions/normaldistribution.hpp>
 
 namespace QuantLib {
 
@@ -50,6 +51,31 @@ namespace QuantLib {
 
       private:
         ext::shared_ptr<GeneralizedBlackScholesProcess> process_;
+        CumulativeNormalDistribution f_;
+        // helper methods
+        Real spot() const;
+        Real strike() const;
+        Real variance() const;
+        Real barrier() const;
+        Real rebate() const; 
+        Real stdDeviation() const;
+        Rate riskFreeRate() const;
+        DiscountFactor riskFreeDiscount() const;
+        Rate dividendYield() const;
+        DiscountFactor dividendDiscount() const;
+        Rate mu() const;
+        Real muSigma() const;
+        Real phi;
+        Real eta;
+        Real A1(Real phi) const;
+        Real A2(Real phi) const;
+        Real A3(Real eta) const;
+        Real A4(Real eta) const;
+        Real A5(Real eta) const;
+        Real B1(Real phi) const;
+        Real B2(Real phi) const;
+        Real B3(Real eta) const;
+        Real B4(Real eta) const;
     };
 
 }

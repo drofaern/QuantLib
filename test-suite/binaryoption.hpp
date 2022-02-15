@@ -27,8 +27,7 @@
 
 class BinaryOptionTest {
   public:
-    static void testCashOrNothingHaugValues();
-    static void testAssetOrNothingHaugValues();
+    static void testAnalyticBinaryBarrierEngineValues();
     static boost::unit_test_framework::test_suite* suite();
 };
 
