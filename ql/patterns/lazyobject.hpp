@@ -165,6 +165,7 @@ namespace QuantLib {
                                   // case of bootstrapping
             try {
                 performCalculations();
+                calculated_ = true;
             } catch (...) {
                 calculated_ = false;
                 throw;

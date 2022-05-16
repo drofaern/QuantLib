@@ -56,11 +56,9 @@ namespace QuantLib {
         bool isOptionActive = false;
         bool isKnockOut = false;
         int ko = 0;
-        Size knockNode = 0;
+        Size knockNode = 1;
         Real asset_price = path.front();
         Real new_asset_price;
-        Real x, y;
-        Volatility vol;
         const TimeGrid& timeGrid = path.timeGrid();
         Time dt;
         std::vector<Real> u = sequenceGen_.nextSequence().value;
@@ -70,15 +68,10 @@ namespace QuantLib {
         {
            new_asset_price = path[i+1];
            // terminal or initial vol?
-           vol = diffProcess_->diffusion(timeGrid[i], asset_price);
-           dt = timeGrid.dt(i);
 
-           x = std::log(new_asset_price / asset_price);
-           y = 0.5 * (x + std::sqrt(x * x - 2 * vol * vol * dt * std::log((1 - u[i]))));
-           y = asset_price * std::exp(y);
-           if (timeGrid[i] > fixings_[knockNode] && timeGrid[i] <= fixings_[knockNode + 1])
+           if (timeGrid[i] < fixings_[knockNode] && timeGrid[i + 1] >= fixings_[knockNode])
            {
-              if (y >= koBarrier_)
+              if (new_asset_price >= koBarrier_)
               {
                  isKnockOut = true;
                  ko = i;
@@ -87,7 +80,7 @@ namespace QuantLib {
               if (!isKnockOut)
                  knockNode = knockNode + 1;
            }
-           if (y <= kiBarrier_)
+           if (new_asset_price <= kiBarrier_)
            {
               isOptionActive = true;
            }

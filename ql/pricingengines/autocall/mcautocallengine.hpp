@@ -30,6 +30,7 @@
 #include <ql/instruments/autocall/autocall.hpp>
 #include <ql/pricingengines/mcsimulation.hpp>
 #include <ql/processes/blackscholesprocess.hpp>
+#include <ql/quotes/simplequote.hpp>
 #include <utility>
 
 namespace QuantLib {
@@ -62,13 +63,32 @@ namespace QuantLib {
             Real spot = process_->x0();
             QL_REQUIRE(spot >= 0.0, "negative or null underlying given");
             //QL_REQUIRE(!triggered(spot), "barrier touched");
+
+            Real delta_s = 1;
+
+            ext::static_pointer_cast<SimpleQuote>(process_->stateVariable().currentLink())->setValue(spot + delta_s);
             McSimulation<SingleVariate,RNG,S>::calculate(requiredTolerance_,
                                                          requiredSamples_,
                                                          maxSamples_);
-            results_.value = this->mcModel_->sampleAccumulator().mean();
+            Real delta_u = this->mcModel_->sampleAccumulator().mean();
+            
+            ext::static_pointer_cast<SimpleQuote>(process_->stateVariable().currentLink())->setValue(spot - delta_s);
+            McSimulation<SingleVariate,RNG,S>::calculate(requiredTolerance_,
+                                                         requiredSamples_,
+                                                         maxSamples_);
+            Real delta_d = this->mcModel_->sampleAccumulator().mean();
+
+            ext::static_pointer_cast<SimpleQuote>(process_->stateVariable().currentLink())->setValue(spot);
+            McSimulation<SingleVariate,RNG,S>::calculate(requiredTolerance_,
+                                                         requiredSamples_,
+                                                         maxSamples_);
+            Real npv = this->mcModel_->sampleAccumulator().mean();
+            results_.value = npv;
+            results_.delta = (delta_u - delta_d) / (2 * delta_s);
+            results_.gamma = (delta_u - 2 * npv + delta_d) / (delta_s * delta_s);
             if (RNG::allowsErrorEstimate)
             results_.errorEstimate =
-                this->mcModel_->sampleAccumulator().errorEstimate();
+                this->mcModel_->sampleAccumulator().errorEstimate();            
         }
 
       protected:

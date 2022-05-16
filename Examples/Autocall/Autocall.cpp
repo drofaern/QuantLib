@@ -65,7 +65,7 @@ int main(int, char* []) {
         Real koBarrier = 103;
         Real underlying = 100;
         Real strike = 100;
-        Real margin = 100;
+        Real margin = 0;
         Spread dividendYield = 0.00;
         Rate riskFreeRate = 0.03;
         Volatility volatility = 0.40;
@@ -122,7 +122,7 @@ int main(int, char* []) {
                                         new PlainVanillaPayoff(Option::Type::Put, strike));
         ext::shared_ptr<BlackScholesMertonProcess> bsmProcess(
                  new BlackScholesMertonProcess(underlyingH, flatDividendTS,
-                                               flatTermStructure, flatVolTS));   
+                                               flatTermStructure, flatVolTS));
 
         // options        
         Autocall autocall(rebate,
@@ -143,10 +143,10 @@ int main(int, char* []) {
                     .withStepsPerYear(365)
                     .withBrownianBridge()
                     //.withSamples(5000) // 2^17-1
-                    //.withMaxSamples(1048575) // 2^20-1
+                    .withMaxSamples(20000000) // 2^20-1
                     //.withAntitheticVariate()
-                    .withAbsoluteTolerance(0.01)
-                    .withSeed(8);
+                    .withAbsoluteTolerance(0.05)
+                    .withSeed(19);
         autocall.setPricingEngine(mcengine);
 
         std::cout << std::setw(widths[0]) << std::left << method
@@ -155,6 +155,35 @@ int main(int, char* []) {
                   << std::setw(widths[2]) << std::left << "N/A"
                   << std::setw(widths[3]) << std::left << "N/A"
                   << std::endl;
+
+        std::cout << std::setw(widths[0]) << std::left << method
+                  << std::fixed
+                  << std::setw(widths[1]) << std::left << autocall.delta()
+                  << std::setw(widths[2]) << std::left << "N/A"
+                  << std::setw(widths[3]) << std::left << "N/A"
+                  << std::endl;
+        std::cout << std::setw(widths[0]) << std::left << method
+                  << std::fixed
+                  << std::setw(widths[1]) << std::left << autocall.gamma()
+                  << std::setw(widths[2]) << std::left << "N/A"
+                  << std::setw(widths[3]) << std::left << "N/A"
+                  << std::endl;
+
+        // ext::static_pointer_cast<SimpleQuote> (underlyingH.currentLink())->setValue(underlying+0.01);
+        // std::cout << std::setw(widths[0]) << std::left << method
+        //           << std::fixed
+        //           << std::setw(widths[1]) << std::left << autocall.NPV()
+        //           << std::setw(widths[2]) << std::left << "N/A"
+        //           << std::setw(widths[3]) << std::left << "N/A"
+        //           << std::endl;
+        
+        // ext::static_pointer_cast<SimpleQuote> (underlyingH.currentLink())->setValue(underlying-0.01);
+        // std::cout << std::setw(widths[0]) << std::left << method
+        //           << std::fixed
+        //           << std::setw(widths[1]) << std::left << autocall.NPV()
+        //           << std::setw(widths[2]) << std::left << "N/A"
+        //           << std::setw(widths[3]) << std::left << "N/A"
+        //           << std::endl;
 
         // End test
         return 0;
