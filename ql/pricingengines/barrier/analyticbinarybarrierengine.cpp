@@ -370,9 +370,9 @@ namespace QuantLib {
             K = coo->cashPayoff();
          else
             K = barrier();
-         Real lambda = std::sqrt(mu() * mu() + 2 * std::log(riskFreeDiscount()) / (stdDeviation() * stdDeviation()));
-         return K * (std::pow((barrier()/ strike()), mu() + lambda) * f_(eta*(log_H_S/stdDeviation() + lambda*stdDeviation())) +
-              std::pow((barrier()/ strike()), mu() - lambda) * f_(eta*(log_H_S/stdDeviation() + lambda*stdDeviation()) - 2*eta*lambda*stdDeviation()));
+         Real lambda = std::sqrt(mu() * mu() - 2 * std::log(riskFreeDiscount()) / (stdDeviation() * stdDeviation()));
+         return K * (std::pow((barrier()/ spot()), mu() + lambda) * f_(eta*(log_H_S/stdDeviation() + lambda*stdDeviation())) +
+              std::pow((barrier()/ spot()), mu() - lambda) * f_(eta*(log_H_S/stdDeviation() + lambda*stdDeviation()) - 2*eta*lambda*stdDeviation()));
     }
 
     Real AnalyticBinaryBarrierEngine::B1(Real phi) const {

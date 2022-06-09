@@ -88,10 +88,10 @@ namespace QuantLib {
         }
 
         if (!isKnockOut && !isOptionActive)
-           return (coupon_ * timeGrid.back() + margin_) * discounts_.back();        
+           return (coupon_ * timeGrid.back() + margin_) * discounts_.back();
         if (isKnockOut)
            return (rebate_ * timeGrid[(int)ko] + margin_) * discounts_[(int)ko];
-        if (isOptionActive)           
+        if (isOptionActive)
            return (margin_ - payoff_(asset_price)) * discounts_.back();
         return 0;
     }
