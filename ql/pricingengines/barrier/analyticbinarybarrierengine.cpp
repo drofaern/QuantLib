@@ -301,7 +301,6 @@ namespace QuantLib {
         }
 
         results_.value = result;
-        return;
     }
 
     Real AnalyticBinaryBarrierEngine::variance() const {
